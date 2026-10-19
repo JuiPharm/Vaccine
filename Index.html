@@ -1,0 +1,1220 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ระบบแนะนำวัคซีนตามช่วงวัยและคำนวณวันนัดหมาย (Vaccine Clinical Assistant)</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <style>
+    body {
+      font-family: 'Sarabun', sans-serif;
+      background-color: #f1f5f9;
+    }
+    .tab-active {
+      border-bottom: 3px solid #0284c7;
+      color: #0369a1;
+      background-color: #f0f9ff;
+      font-weight: 700;
+    }
+    @media print {
+      body * {
+        visibility: hidden;
+      }
+      #print-area, #print-area * {
+        visibility: visible;
+      }
+      #print-area {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+        box-shadow: none !important;
+        border: 1px solid #cbd5e1 !important;
+      }
+      .no-print {
+        display: none !important;
+      }
+    }
+  </style>
+</head>
+<body class="text-slate-800 min-h-screen flex flex-col">
+
+  <!-- Header -->
+  <header class="bg-gradient-to-r from-sky-800 via-sky-700 to-teal-700 text-white shadow-lg no-print">
+    <div class="max-w-7xl mx-auto px-4 py-4 sm:px-6 lg:px-8 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+      <div class="flex items-center gap-3">
+        <div class="bg-white/15 p-3 rounded-xl backdrop-blur-sm">
+          <i class="fa-solid fa-syringe text-2xl text-teal-200"></i>
+        </div>
+        <div>
+          <h1 class="text-xl sm:text-2xl font-bold tracking-tight">Vaccine Clinical Decision & Appointment System</h1>
+          <p class="text-xs sm:text-sm text-sky-100">ระบบคัดกรองแนะนำวัคซีนตามช่วงวัย ความเสี่ยง และคำนวณวันนัดหมายเข็มถัดไป (อ้างอิง PIDST & IDAT 2569)</p>
+        </div>
+      </div>
+      <div class="flex items-center gap-2 text-xs bg-black/20 px-3.5 py-2 rounded-lg self-start md:self-auto">
+        <i class="fa-solid fa-shield-heart text-teal-300"></i>
+        <span>Clinical Pharmacy & Immunization Service</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Navigation Tabs -->
+  <nav class="bg-white shadow-sm border-b border-slate-200 sticky top-0 z-20 no-print">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex overflow-x-auto no-scrollbar">
+        <button onclick="switchTab('tab-screening')" id="btn-tab-screening" class="tab-active flex items-center gap-2.5 px-6 py-4 text-sm sm:text-base border-b-3 transition-all whitespace-nowrap">
+          <i class="fa-solid fa-user-check text-sky-600"></i>
+          <span>1. คัดกรองและแนะนำวัคซีนตามเงื่อนไขผู้รับบริการ</span>
+        </button>
+        <button onclick="switchTab('tab-calculator')" id="btn-tab-calculator" class="flex items-center gap-2.5 px-6 py-4 text-sm sm:text-base text-slate-600 hover:text-sky-700 hover:bg-slate-50 transition-all whitespace-nowrap">
+          <i class="fa-solid fa-calendar-check text-teal-600"></i>
+          <span>2. คำนวณวันนัดเข็มถัดไป (Next Appointment)</span>
+        </button>
+        <button onclick="switchTab('tab-reference')" id="btn-tab-reference" class="flex items-center gap-2.5 px-6 py-4 text-sm sm:text-base text-slate-600 hover:text-sky-700 hover:bg-slate-50 transition-all whitespace-nowrap">
+          <i class="fa-solid fa-book-medical text-indigo-600"></i>
+          <span>3. ตารางฐานข้อมูลวัคซีน & ข้อควรระวังพิเศษ</span>
+        </button>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Main Content -->
+  <main class="max-w-7xl mx-auto px-4 py-6 sm:px-6 lg:px-8 flex-grow w-full">
+
+    <!-- ==========================================
+         TAB 1: PATIENT SCREENING & RECOMMENDATION (FIRST PRIORITY)
+    =========================================== -->
+    <section id="tab-screening" class="space-y-6">
+      
+      <!-- Patient Condition Selector Panel -->
+      <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-5 sm:p-6">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-4 mb-5 border-b border-slate-100">
+          <div>
+            <h2 class="text-lg font-bold text-slate-800 flex items-center gap-2">
+              <i class="fa-solid fa-sliders text-sky-600"></i>
+              ระบุข้อมูลและสภาวะของผู้มารับบริการ (Patient Profile & Conditions)
+            </h2>
+            <p class="text-xs sm:text-sm text-slate-500">เลือกช่วงวัยและสภาวะร่างกาย ระบบจะคัดกรองวัคซีนที่แนะนำให้ฉีดเป็นอันดับแรก พร้อมแจ้งเตือนวัคซีนที่ห้ามใช้</p>
+          </div>
+          <button onclick="resetPatientFilter()" class="text-xs text-slate-500 hover:text-rose-600 flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 hover:border-rose-200 self-start sm:self-auto transition">
+            <i class="fa-solid fa-rotate-left"></i> ล้างค่าเริ่มต้น
+          </button>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          <!-- Step 1: Age Group -->
+          <div class="lg:col-span-5 space-y-3">
+            <label class="block text-sm font-semibold text-slate-700">
+              1. เลือกช่วงอายุของผู้มารับบริการ <span class="text-rose-500">*</span>
+            </label>
+            <select id="ageGroupSelect" onchange="renderRecommendations()" class="w-full rounded-xl border-slate-300 bg-slate-50 px-4 py-3 text-sm sm:text-base font-medium text-slate-800 shadow-sm focus:border-sky-500 focus:ring-2 focus:ring-sky-200 outline-none border">
+              <option value="infant_0_6m">ทารกแรกเกิด – 6 เดือน (0–6 Months)</option>
+              <option value="child_9m_2y">เด็กเล็ก 9 เดือน – 2 ปีครึ่ง (9 Months – 2.5 Years)</option>
+              <option value="child_4_6y">เด็กวัยเรียน 4 – 6 ปี (4–6 Years)</option>
+              <option value="adolescent_9_18y">เด็กโตและวัยรุ่น 9 – 18 ปี (9–18 Years)</option>
+              <option value="adult_19_26y" selected>ผู้ใหญ่ตอนต้น 19 – 26 ปี (19–26 Years)</option>
+              <option value="adult_27_49y">ผู้ใหญ่วัยทำงาน 27 – 49 ปี (27–49 Years)</option>
+              <option value="adult_50_59y">ผู้ใหญ่วัยกลางคน 50 – 59 ปี (50–59 Years)</option>
+              <option value="senior_60_plus">ผู้สูงอายุ 60 – 65 ปีขึ้นไป (Elderly ≥ 60 Years)</option>
+            </select>
+
+            <!-- Quick Preset Pills -->
+            <div class="pt-2">
+              <span class="text-xs font-medium text-slate-400 block mb-2">ตัวเลือกด่วน (Quick Presets):</span>
+              <div class="flex flex-wrap gap-1.5">
+                <button type="button" onclick="applyQuickPreset('infant_0_6m', [])" class="text-xs bg-sky-50 hover:bg-sky-100 text-sky-700 px-2.5 py-1.5 rounded-lg border border-sky-200 transition">👶 เด็กแรกเกิด-6 เดือน</button>
+                <button type="button" onclick="applyQuickPreset('adolescent_9_18y', [])" class="text-xs bg-sky-50 hover:bg-sky-100 text-sky-700 px-2.5 py-1.5 rounded-lg border border-sky-200 transition">🧒 วัยรุ่น 9-18 ปี</button>
+                <button type="button" onclick="applyQuickPreset('adult_27_49y', ['pregnant'])" class="text-xs bg-pink-50 hover:bg-pink-100 text-pink-700 px-2.5 py-1.5 rounded-lg border border-pink-200 transition">🤰 หญิงตั้งครรภ์</button>
+                <button type="button" onclick="applyQuickPreset('senior_60_plus', ['chronic'])" class="text-xs bg-amber-50 hover:bg-amber-100 text-amber-800 px-2.5 py-1.5 rounded-lg border border-amber-200 transition">🧓 ผู้สูงอายุ ≥60 ปี + โรคเรื้อรัง</button>
+                <button type="button" onclick="applyQuickPreset('adult_27_49y', ['immunocompromised', 'asplenia'])" class="text-xs bg-purple-50 hover:bg-purple-100 text-purple-700 px-2.5 py-1.5 rounded-lg border border-purple-200 transition">🛡️ ภูมิคุ้มกันบกพร่อง/ไม่มีม้าม</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Step 2: Special Conditions & Risk Checkboxes -->
+          <div class="lg:col-span-7 space-y-3">
+            <label class="block text-sm font-semibold text-slate-700">
+              2. สภาวะพิเศษ / โรคประจำตัว / ความเสี่ยงร่วม (เลือกได้มากกว่า 1 ข้อ)
+            </label>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+              <!-- Pregnant -->
+              <label class="flex items-start gap-3 p-3 rounded-xl border border-slate-200 hover:bg-pink-50/50 cursor-pointer transition select-none has-[:checked]:border-pink-500 has-[:checked]:bg-pink-50">
+                <input type="checkbox" value="pregnant" class="cond-checkbox mt-1 h-4 w-4 text-pink-600 rounded focus:ring-pink-500" onchange="renderRecommendations()">
+                <div class="text-xs sm:text-sm">
+                  <div class="font-bold text-slate-800 flex items-center gap-1.5">
+                    <i class="fa-solid fa-person-pregnant text-pink-600"></i> หญิงตั้งครรภ์ (Pregnancy)
+                  </div>
+                  <span class="text-slate-500 text-xs">คัดกรองวัคซีนจำเป็นในครรภ์ & ตัดวัคซีนเชื้อเป็น</span>
+                </div>
+              </label>
+
+              <!-- Immunocompromised -->
+              <label class="flex items-start gap-3 p-3 rounded-xl border border-slate-200 hover:bg-purple-50/50 cursor-pointer transition select-none has-[:checked]:border-purple-500 has-[:checked]:bg-purple-50">
+                <input type="checkbox" value="immunocompromised" class="cond-checkbox mt-1 h-4 w-4 text-purple-600 rounded focus:ring-purple-500" onchange="renderRecommendations()">
+                <div class="text-xs sm:text-sm">
+                  <div class="font-bold text-slate-800 flex items-center gap-1.5">
+                    <i class="fa-solid fa-virus-slash text-purple-600"></i> ภูมิคุ้มกันบกพร่อง / ยากดภูมิ / HIV
+                  </div>
+                  <span class="text-slate-500 text-xs">เปลี่ยนตารางวัคซีนและระวังวัคซีนเชื้อเป็นอ่อนฤทธิ์</span>
+                </div>
+              </label>
+
+              <!-- Asplenia -->
+              <label class="flex items-start gap-3 p-3 rounded-xl border border-slate-200 hover:bg-amber-50/50 cursor-pointer transition select-none has-[:checked]:border-amber-500 has-[:checked]:bg-amber-50">
+                <input type="checkbox" value="asplenia" class="cond-checkbox mt-1 h-4 w-4 text-amber-600 rounded focus:ring-amber-500" onchange="renderRecommendations()">
+                <div class="text-xs sm:text-sm">
+                  <div class="font-bold text-slate-800 flex items-center gap-1.5">
+                    <i class="fa-solid fa-staff-snake text-amber-600"></i> ไม่มีม้าม / ม้ามทำงานผิดปกติ
+                  </div>
+                  <span class="text-slate-500 text-xs">เน้น Pneumococcal, Hib และ Meningococcal</span>
+                </div>
+              </label>
+
+              <!-- CKD / Dialysis -->
+              <label class="flex items-start gap-3 p-3 rounded-xl border border-slate-200 hover:bg-blue-50/50 cursor-pointer transition select-none has-[:checked]:border-blue-500 has-[:checked]:bg-blue-50">
+                <input type="checkbox" value="ckd" class="cond-checkbox mt-1 h-4 w-4 text-blue-600 rounded focus:ring-blue-500" onchange="renderRecommendations()">
+                <div class="text-xs sm:text-sm">
+                  <div class="font-bold text-slate-800 flex items-center gap-1.5">
+                    <i class="fa-solid fa-droplet text-blue-600"></i> โรคไตเรื้อรัง / ฟอกไต (CKD/Dialysis)
+                  </div>
+                  <span class="text-slate-500 text-xs">ปรับขนาดโดส Hepatitis B (40 mcg x 4 เข็ม) & PCV</span>
+                </div>
+              </label>
+
+              <!-- Chronic NCDs -->
+              <label class="flex items-start gap-3 p-3 rounded-xl border border-slate-200 hover:bg-teal-50/50 cursor-pointer transition select-none has-[:checked]:border-teal-500 has-[:checked]:bg-teal-50">
+                <input type="checkbox" value="chronic" class="cond-checkbox mt-1 h-4 w-4 text-teal-600 rounded focus:ring-teal-500" onchange="renderRecommendations()">
+                <div class="text-xs sm:text-sm">
+                  <div class="font-bold text-slate-800 flex items-center gap-1.5">
+                    <i class="fa-solid fa-heart-pulse text-teal-600"></i> โรคเรื้อรัง (เบาหวาน/หัวใจ/ปอด/ตับ)
+                  </div>
+                  <span class="text-slate-500 text-xs">เพิ่มข้อบ่งใช้ RSV, Pneumococcal, Influenza, HB</span>
+                </div>
+              </label>
+
+              <!-- Healthcare Worker / Traveler -->
+              <label class="flex items-start gap-3 p-3 rounded-xl border border-slate-200 hover:bg-indigo-50/50 cursor-pointer transition select-none has-[:checked]:border-indigo-500 has-[:checked]:bg-indigo-50">
+                <input type="checkbox" value="hcw_travel" class="cond-checkbox mt-1 h-4 w-4 text-indigo-600 rounded focus:ring-indigo-500" onchange="renderRecommendations()">
+                <div class="text-xs sm:text-sm">
+                  <div class="font-bold text-slate-800 flex items-center gap-1.5">
+                    <i class="fa-solid fa-user-doctor text-indigo-600"></i> บุคลากรทางการแพทย์ / นักเดินทาง
+                  </div>
+                  <span class="text-slate-500 text-xs">แนะนำ MMR, Varicella, Tdap, Meningococcal, Rabies</span>
+                </div>
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <!-- Search filter inside results -->
+        <div class="mt-5 pt-4 border-t border-slate-100 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+          <div id="activeProfileSummary" class="text-xs sm:text-sm font-medium text-sky-900 bg-sky-50 px-3.5 py-2 rounded-xl border border-sky-200 flex items-center gap-2">
+            <!-- Dynamic Summary -->
+          </div>
+          <div class="relative w-full sm:w-72">
+            <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-2.5 text-slate-400 text-sm"></i>
+            <input type="text" id="searchVaccineInput" oninput="renderRecommendations()" placeholder="ค้นหาชื่อวัคซีน, ชื่อการค้า (เช่น Shingrix)..." class="w-full pl-9 pr-3 py-1.5 text-sm rounded-xl border border-slate-300 focus:border-sky-500 outline-none">
+          </div>
+        </div>
+      </div>
+
+      <!-- Priority 1: Recommended Vaccines -->
+      <div class="space-y-4">
+        <div class="flex items-center justify-between">
+          <h3 class="text-base sm:text-lg font-bold text-slate-800 flex items-center gap-2">
+            <span class="bg-emerald-600 text-white w-6 h-6 rounded-full inline-flex items-center justify-center text-xs"><i class="fa-solid fa-check"></i></span>
+            วัคซีนที่แนะนำให้ฉีดตามเงื่อนไขที่เลือก (Priority Recommended Vaccines)
+          </h3>
+          <span id="recommendedCountBadge" class="text-xs font-bold bg-emerald-100 text-emerald-800 px-3 py-1 rounded-full">0 รายการ</span>
+        </div>
+
+        <div id="recommendedCardsContainer" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <!-- Populated by JS -->
+        </div>
+      </div>
+
+      <!-- Priority 2: Contraindicated / Precaution Alert Box (Shown when pregnant or immunocompromised is checked) -->
+      <div id="contraindicatedSection" class="hidden space-y-3 pt-2">
+        <div class="bg-rose-50 border border-rose-200 rounded-2xl p-4 sm:p-5">
+          <h3 class="text-sm sm:text-base font-bold text-rose-800 flex items-center gap-2 mb-3">
+            <i class="fa-solid fa-triangle-exclamation text-rose-600"></i>
+            วัคซีนที่ห้ามฉีด หรือต้องหลีกเลี่ยงในสภาวะที่เลือก (Contraindicated / Avoid)
+          </h3>
+          <div id="contraindicatedContainer" class="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <!-- Populated by JS -->
+          </div>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- ==========================================
+         TAB 2: NEXT APPOINTMENT DATE CALCULATOR
+    =========================================== -->
+    <section id="tab-calculator" class="hidden space-y-6">
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        
+        <!-- Left Input Form -->
+        <div class="lg:col-span-5 bg-white rounded-2xl shadow-sm border border-slate-200 p-5 sm:p-6 space-y-5">
+          <div class="border-b border-slate-100 pb-3">
+            <h2 class="text-lg font-bold text-slate-800 flex items-center gap-2">
+              <i class="fa-solid fa-calculator text-teal-600"></i>
+              คำนวณวันนัดฉีดวัคซีนเข็มถัดไป
+            </h2>
+            <p class="text-xs text-slate-500 mt-0.5">เลือกวัคซีน เข็มที่ฉีด และวันที่รับบริการ เพื่อคำนวณวันนัดหมายเข็มต่อไปและตารางครบชุด</p>
+          </div>
+
+          <div class="space-y-4">
+            <!-- Patient Name (Optional for Slip) -->
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">ชื่อ-นามสกุล / HN ผู้รับบริการ (สำหรับพิมพ์ใบนัด)</label>
+              <input type="text" id="calcPatientName" placeholder="ระบุชื่อผู้รับบริการ หรือเว้นว่าง..." class="w-full rounded-xl border border-slate-300 px-3.5 py-2 text-sm focus:border-teal-600 outline-none">
+            </div>
+
+            <!-- Select Vaccine Regimen -->
+            <div>
+              <label class="block text-xs font-semibold text-slate-700 mb-1">เลือกชนิดวัคซีนและสูตรการบริหาร (Vaccine Regimen) <span class="text-rose-500">*</span></label>
+              <select id="calcVaccineSelect" onchange="onCalculatorVaccineChange()" class="w-full rounded-xl border border-slate-300 bg-slate-50 px-3.5 py-2.5 text-sm font-medium text-slate-800 focus:border-teal-600 outline-none">
+                <!-- Populated by JS -->
+              </select>
+            </div>
+
+            <!-- Selected Vaccine Quick Info Box -->
+            <div id="calcVaccineMetaBox" class="bg-slate-50 rounded-xl p-3.5 border border-slate-200 text-xs space-y-1.5">
+              <!-- Populated by JS -->
+            </div>
+
+            <!-- Current Dose Number -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label class="block text-xs font-semibold text-slate-700 mb-1">เข็มที่ได้รับในครั้งนี้ <span class="text-rose-500">*</span></label>
+                <select id="calcCurrentDose" onchange="calculateNextAppointment()" class="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm font-medium focus:border-teal-600 outline-none">
+                  <!-- Populated by JS -->
+                </select>
+              </div>
+              <div>
+                <label class="block text-xs font-semibold text-slate-700 mb-1">วันที่ฉีดวัคซีนเข็มนี้ <span class="text-rose-500">*</span></label>
+                <input type="date" id="calcDoseDate" onchange="calculateNextAppointment()" class="w-full rounded-xl border border-slate-300 px-3.5 py-2 text-sm font-medium focus:border-teal-600 outline-none">
+              </div>
+            </div>
+
+            <button type="button" onclick="calculateNextAppointment()" class="w-full bg-teal-600 hover:bg-teal-700 text-white font-semibold py-3 rounded-xl shadow-sm transition flex items-center justify-center gap-2 text-sm">
+              <i class="fa-solid fa-calendar-plus"></i> คำนวณวันนัดหมายเข็มถัดไป
+            </button>
+          </div>
+        </div>
+
+        <!-- Right Output & Appointment Slip -->
+        <div class="lg:col-span-7 space-y-5">
+          <div id="print-area" class="bg-white rounded-2xl shadow-sm border border-slate-200 p-5 sm:p-6 space-y-5">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-200 pb-4">
+              <div>
+                <span class="text-xs font-bold uppercase tracking-wider text-teal-700 bg-teal-50 px-2.5 py-1 rounded-md border border-teal-200">Vaccination Appointment Slip</span>
+                <h3 id="slipTitle" class="text-lg font-bold text-slate-800 mt-1.5">ใบนัดหมายการรับวัคซีนเข็มถัดไป</h3>
+                <p id="slipPatientDisplay" class="text-xs text-slate-500"></p>
+              </div>
+              <div class="flex gap-2 no-print">
+                <button onclick="copyAppointmentText()" class="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium px-3 py-2 rounded-xl transition flex items-center gap-1.5">
+                  <i class="fa-regular fa-copy"></i> คัดลอกผล
+                </button>
+                <button onclick="window.print()" class="text-xs bg-sky-600 hover:bg-sky-700 text-white font-medium px-3.5 py-2 rounded-xl transition flex items-center gap-1.5">
+                  <i class="fa-solid fa-print"></i> พิมพ์ใบนัด
+                </button>
+              </div>
+            </div>
+
+            <!-- Highlight Next Appointment Result -->
+            <div id="nextDoseHighlightBox" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <!-- Populated by JS -->
+            </div>
+
+            <!-- Full Multi-dose Timeline Table -->
+            <div>
+              <h4 class="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2.5 flex items-center gap-1.5">
+                <i class="fa-solid fa-list-ol text-teal-600"></i> แผนการฉีดวัคซีนครบชุด (Complete Regimen Timeline)
+              </h4>
+              <div class="overflow-x-auto border border-slate-200 rounded-xl">
+                <table class="w-full text-left border-collapse text-xs sm:text-sm">
+                  <thead>
+                    <tr class="bg-slate-50 text-slate-600 border-b border-slate-200">
+                      <th class="py-2.5 px-3 font-semibold">เข็มที่ (Dose)</th>
+                      <th class="py-2.5 px-3 font-semibold">วันที่แนะนำ (Recommended)</th>
+                      <th class="py-2.5 px-3 font-semibold">ฉีดได้เร็วสุด (Minimum Date)</th>
+                      <th class="py-2.5 px-3 font-semibold">เกณฑ์ระยะห่าง</th>
+                    </tr>
+                  </thead>
+                  <tbody id="timelineTableBody" class="divide-y divide-slate-100">
+                    <!-- Populated by JS -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- Clinical Notes on Slip -->
+            <div id="slipClinicalNote" class="bg-amber-50/80 border border-amber-200 rounded-xl p-3.5 text-xs text-amber-900 space-y-1">
+              <!-- Populated by JS -->
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ==========================================
+         TAB 3: MASTER DATABASE & CLINICAL RULES
+    =========================================== -->
+    <section id="tab-reference" class="hidden space-y-6">
+      <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-5 sm:p-6 space-y-4">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
+          <div>
+            <h2 class="text-lg font-bold text-slate-800 flex items-center gap-2">
+              <i class="fa-solid fa-table-list text-indigo-600"></i>
+              ตารางสรุปข้อมูลวัคซีน ชื่อการค้า ประเภท และระยะห่างระหว่างโดสทั้งหมด
+            </h2>
+            <p class="text-xs text-slate-500">รวบรวมข้อมูลตามแนวทาง PIDST และ IDAT 2569 สามารถคลิกปุ่ม "คำนวณวันนัด" เพื่อส่งเข้าเครื่องคิดเลขได้ทันที</p>
+          </div>
+        </div>
+
+        <div class="overflow-x-auto border border-slate-200 rounded-xl">
+          <table class="w-full text-left border-collapse text-xs sm:text-sm">
+            <thead>
+              <tr class="bg-slate-100 text-slate-700 border-b border-slate-200">
+                <th class="py-3 px-3 font-bold">วัคซีน</th>
+                <th class="py-3 px-3 font-bold">ชื่อการค้า (Trade Names)</th>
+                <th class="py-3 px-3 font-bold">ประเภท / วิธีบริหาร</th>
+                <th class="py-3 px-3 font-bold">ข้อบ่งใช้และช่วงวัย</th>
+                <th class="py-3 px-3 font-bold">จำนวนโดส & ระยะห่าง</th>
+                <th class="py-3 px-3 font-bold text-center">คำนวณ</th>
+              </tr>
+            </thead>
+            <tbody id="masterTableBody" class="divide-y divide-slate-200">
+              <!-- Populated by JS -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Co-administration & Special Clinical Rules -->
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm">
+          <h3 class="font-bold text-sm text-sky-800 flex items-center gap-2 mb-2">
+            <i class="fa-solid fa-vials text-sky-600"></i> หลักการให้วัคซีนร่วมกัน (Co-administration)
+          </h3>
+          <p class="text-xs text-slate-600 leading-relaxed">
+            • <strong>วัคซีนเชื้อเป็นอ่อนฤทธิ์ (Live-attenuated)</strong> เช่น MMR, Varicella, LAJE, Qdenga, Yellow Fever สามารถฉีดพร้อมกันในวันเดียวได้ (คนละตำแหน่ง ห่างกัน ≥ 1 นิ้ว) <strong>หากไม่ฉีดวันเดียวกัน ต้องเว้นระยะห่างอย่างน้อย 4 สัปดาห์ (28 วัน)</strong><br>
+            • <strong>วัคซีนเชื้อตาย (Inactivated/Subunit/mRNA)</strong> สามารถฉีดพร้อมกัน หรือฉีดก่อน/หลังวัคซีนอื่นกี่วันก็ได้
+          </p>
+        </div>
+        <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm">
+          <h3 class="font-bold text-sm text-purple-800 flex items-center gap-2 mb-2">
+            <i class="fa-solid fa-shield-virus text-purple-600"></i> ลำดับการฉีดวัคซีน Pneumococcal
+          </h3>
+          <p class="text-xs text-slate-600 leading-relaxed">
+            • ผู้ใหญ่ ≥ 50 ปี หรือผู้ที่มีโรคเรื้อรัง/ภูมิคุ้มกันบกพร่อง: หากเลือกฉีด <strong>PCV20 (Prevnar 20)</strong> เพียง 1 เข็ม ถือว่าครบ ไม่ต้องตามด้วย PPSV23<br>
+            • หากฉีด <strong>PCV13 หรือ PCV15</strong> แนะนำให้ฉีดตามด้วย <strong>PPSV23 (Pneumovax 23)</strong> ห่างกันอย่างน้อย 1 ปี (หรือห่างอย่างน้อย <strong>8 สัปดาห์</strong> ในผู้ที่มีภูมิคุ้มกันบกพร่อง/ไม่มีม้าม/CSF leak)
+          </p>
+        </div>
+        <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm">
+          <h3 class="font-bold text-sm text-rose-800 flex items-center gap-2 mb-2">
+            <i class="fa-solid fa-ban text-rose-600"></i> ข้อห้ามสำคัญในหญิงตั้งครรภ์
+          </h3>
+          <p class="text-xs text-slate-600 leading-relaxed">
+            • <strong>วัคซีนที่แนะนำในทุกครรภ์:</strong> Influenza (ทุกไตรมาส), Tdap (27–36 สัปดาห์), RSV เฉพาะรุ่น <strong>Abrysvo</strong> (24–36 สัปดาห์)<br>
+            • <strong>วัคซีนที่ห้ามฉีดขณะตั้งครรภ์:</strong> MMR, Varicella, วัคซีนไข้เลือดออก (Qdenga), LAJE, HPV และวัคซีนงูสวัด
+          </p>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <script>
+    // =========================================================================
+    // MASTER CLINICAL VACCINE DATABASE (PIDST & IDAT 2569)
+    // =========================================================================
+    const VACCINE_DB = [
+      {
+        id: 'hepb_ped',
+        name: 'วัคซีนไวรัสตับอักเสบบี (ในทารกแรกเกิด)',
+        shortCode: 'HB (Pediatric)',
+        tradeNames: 'Engerix-B Junior®, Heberbiovac HB®, ชนิดรวม Hexaxim®, Infanrix Hexa®',
+        vaccineType: 'Recombinant viral antigen (เชื้อตาย)',
+        route: 'IM (0.5 mL) บริเวณหน้าขา',
+        ageGroups: ['infant_0_6m'],
+        riskTags: [],
+        contraindicatedIn: [],
+        priorityLevel: 'EPI พื้นฐานจำเป็น',
+        indication: 'ทารกแรกเกิดทุกคน ฉีดเข็มแรกเร็วที่สุดภายใน 24 ชม. หลังคลอด (หากมารดา HBsAg เป็นบวก ให้ฉีด HB1 พร้อม HBIG 0.5 mL คนละข้างภายใน 12 ชม. และต้องได้รับเข็มที่ 2 ตอนอายุ 1 เดือน)',
+        totalDosesText: '3–4 เข็ม (0, 1–2, 6 เดือน หรือ 0, 2, 4, 6 เดือนเมื่อใช้วัคซีนรวม)',
+        doses: [
+          { doseNo: 1, label: 'เข็มที่ 1 (แรกเกิด)', recNextDays: 30, minNextDays: 28, intervalDesc: 'ห่างเข็ม 2 ประมาณ 1–2 เดือน (ขั้นต่ำ 4 สัปดาห์)' },
+          { doseNo: 2, label: 'เข็มที่ 2 (อายุ 1–2 เดือน)', recNextDays: 150, minNextDays: 56, intervalDesc: 'เข็มที่ 3 ที่อายุ ≥ 6 เดือน (ห่างเข็มสอง ≥ 8 สัปดาห์ และห่างเข็มแรก ≥ 16 สัปดาห์)' },
+          { doseNo: 3, label: 'เข็มที่ 3 (อายุ 6 เดือน)', recNextDays: null, minNextDays: null, intervalDesc: 'ครบชุดพื้นฐาน (อายุต้อง ≥ 24 สัปดาห์)' }
+        ]
+      },
+      {
+        id: 'dtp_hb_hib_ipv',
+        name: 'วัคซีนรวม คอตีบ-บาดทะยัก-ไอกรน-ตับอักเสบบี-ฮิบ-โปลิโอ',
+        shortCode: 'DTwP/DTaP-HB-Hib-IPV',
+        tradeNames: 'Infanrix Hexa® (6 โรค), Hexaxim® (6 โรค), Pentaxim® (5 โรค), Infanrix-IPV/Hib®, Quinvaxem®',
+        vaccineType: 'Toxoid + Inactivated / Acellular Pertussis + Conjugate',
+        route: 'IM (0.5 mL)',
+        ageGroups: ['infant_0_6m', 'child_9m_2y', 'child_4_6y'],
+        riskTags: [],
+        contraindicatedIn: [],
+        priorityLevel: 'EPI พื้นฐานจำเป็น',
+        indication: 'สร้างภูมิคุ้มกันพื้นฐานในเด็กที่อายุ 2, 4, 6 เดือน และฉีดกระตุ้นที่อายุ 18 เดือน และ 4–6 ปี (ช่วง 3 เข็มแรกควรใช้ชนิดเดียวกัน)',
+        totalDosesText: '5 เข็ม (2, 4, 6 เดือน และกระตุ้นที่ 18 เดือน, 4–6 ปี)',
+        doses: [
+          { doseNo: 1, label: 'เข็มที่ 1 (อายุ 2 เดือน)', recNextDays: 60, minNextDays: 28, intervalDesc: 'ห่างกัน 2 เดือน (ขั้นต่ำ 4 สัปดาห์)' },
+          { doseNo: 2, label: 'เข็มที่ 2 (อายุ 4 เดือน)', recNextDays: 60, minNextDays: 28, intervalDesc: 'ห่างกัน 2 เดือน (ขั้นต่ำ 4 สัปดาห์)' },
+          { doseNo: 3, label: 'เข็มที่ 3 (อายุ 6 เดือน)', recNextDays: 365, minNextDays: 180, intervalDesc: 'นัดกระตุ้นเข็ม 4 ที่อายุ 18 เดือน (ห่างเข็มสามอย่างน้อย 6 เดือน)' },
+          { doseNo: 4, label: 'เข็มที่ 4 กระตุ้น 1 (อายุ 18 เดือน)', recNextDays: 912, minNextDays: 180, intervalDesc: 'นัดกระตุ้นเข็ม 5 ที่อายุ 4–6 ปี' },
+          { doseNo: 5, label: 'เข็มที่ 5 กระตุ้น 2 (อายุ 4–6 ปี)', recNextDays: null, minNextDays: null, intervalDesc: 'ครบเกณฑ์วัยเด็ก (กระตุ้น Tdap/Td อีกครั้งที่อายุ 11–12 ปี)' }
+        ]
+      },
+      {
+        id: 'rotavirus',
+        name: 'วัคซีนโรต้าไวรัส (ป้องกันท้องเสียรุนแรงในทารก)',
+        shortCode: 'Rotavirus (RV1 / RV5)',
+        tradeNames: 'Rotarix® (2 หยด), Rotateq® (3 หยด), Rotavac® (3 หยด), Rotasiil®',
+        vaccineType: 'Live-attenuated virus (ชนิดหยอดทางปาก)',
+        route: 'Oral (หยอดทางปาก ห้ามฉีด)',
+        ageGroups: ['infant_0_6m'],
+        riskTags: [],
+        contraindicatedIn: ['immunocompromised', 'pregnant'],
+        priorityLevel: 'EPI พื้นฐานจำเป็น',
+        indication: 'ทารกอายุ 2, 4 เดือน (และ 6 เดือนสำหรับชนิด 3 โดส) โดสแรกต้องเริ่มก่อนอายุ 15 สัปดาห์ และโดสสุดท้ายไม่เกินอายุ 8 เดือน ห้ามใช้ในเด็กภาวะภูมิคุ้มกันบกพร่องรุนแรง (SCID) หรือมีประวัติลำไส้กลืนกัน',
+        totalDosesText: '2 หรือ 3 ครั้ง (ห่างกันครั้งละ 2 เดือน / ขั้นต่ำ 4 สัปดาห์)',
+        doses: [
+          { doseNo: 1, label: 'ครั้งที่ 1 (อายุ 2 เดือน / ห้ามเกิน 15 สัปดาห์)', recNextDays: 60, minNextDays: 28, intervalDesc: 'ห่างกัน 2 เดือน (ขั้นต่ำ 4 สัปดาห์)' },
+          { doseNo: 2, label: 'ครั้งที่ 2 (อายุ 4 เดือน)', recNextDays: 60, minNextDays: 28, intervalDesc: 'หากใช้ Rotarix ถือว่าครบ 2 ครั้ง / หากใช้ Rotateq หรือ Rotavac นัดครั้งที่ 3 อีก 2 เดือน' },
+          { doseNo: 3, label: 'ครั้งที่ 3 (อายุ 6 เดือน เฉพาะรุ่น 3 โดส)', recNextDays: null, minNextDays: null, intervalDesc: 'ครบชุด (ต้องได้รับภายในอายุไม่เกิน 8 เดือน)' }
+        ]
+      },
+      {
+        id: 'pcv_ped',
+        name: 'วัคซีนนิวโมค็อกคัสชนิดคอนจูเกตในเด็ก (PCV)',
+        shortCode: 'PCV10 / PCV13 / PCV15 / PCV20',
+        tradeNames: 'Prevnar 13®, Prevnar 20®, Vaxneuvance® (PCV15), Synflorix® (PCV10), Pneumosil®',
+        vaccineType: 'Polysaccharide-Protein Conjugate (เชื้อตาย)',
+        route: 'IM (0.5 mL)',
+        ageGroups: ['infant_0_6m', 'child_9m_2y'],
+        riskTags: ['asplenia', 'immunocompromised', 'chronic', 'ckd'],
+        contraindicatedIn: [],
+        priorityLevel: 'แนะนำสูง / กลุ่มเสี่ยงจำเป็น',
+        indication: 'ป้องกันปอดอักเสบ เยื่อหุ้มสมองอักเสบ และติดเชื้อในกระแสเลือด เริ่มฉีดที่อายุ 2, 4, 6 เดือน และกระตุ้นที่ 12–15 เดือน (หรือสูตร 2+1 ที่ 2, 4 และ 12–15 เดือนในเด็กปกติ)',
+        totalDosesText: '4 เข็ม (สูตร 3+1 ที่ 2, 4, 6 และ 12–15 เดือน)',
+        doses: [
+          { doseNo: 1, label: 'เข็มที่ 1 (อายุ 2 เดือน)', recNextDays: 60, minNextDays: 28, intervalDesc: 'ห่างกัน 2 เดือน (4–8 สัปดาห์)' },
+          { doseNo: 2, label: 'เข็มที่ 2 (อายุ 4 เดือน)', recNextDays: 60, minNextDays: 28, intervalDesc: 'ห่างกัน 2 เดือน (4–8 สัปดาห์)' },
+          { doseNo: 3, label: 'เข็มที่ 3 (อายุ 6 เดือน)', recNextDays: 180, minNextDays: 56, intervalDesc: 'กระตุ้นเข็มที่ 4 เมื่ออายุ 12–15 เดือน (ห่างเข็มสุดท้ายอย่างน้อย 8 สัปดาห์)' },
+          { doseNo: 4, label: 'เข็มที่ 4 กระตุ้น (อายุ 12–15 เดือน)', recNextDays: null, minNextDays: null, intervalDesc: 'ครบชุด (ในเด็กกลุ่มเสี่ยงอายุ ≥ 2 ปี พิจารณาฉีด PPSV23 ห่างอีก 8 สัปดาห์)' }
+        ]
+      },
+      {
+        id: 'mmr',
+        name: 'วัคซีนรวม หัด-คางทูม-หัดเยอรมัน (MMR)',
+        shortCode: 'MMR / MMRV',
+        tradeNames: 'Priorix®, M-M-R II®, Tresivac®, Priorix-Tetra® (รวมอีสุกอีใส)',
+        vaccineType: 'Live-attenuated virus (วัคซีนเชื้อเป็นอ่อนฤทธิ์)',
+        route: 'SC หรือ IM (0.5 mL)',
+        ageGroups: ['child_9m_2y', 'adolescent_9_18y', 'adult_19_26y', 'adult_27_49y'],
+        riskTags: ['hcw_travel'],
+        contraindicatedIn: ['pregnant', 'immunocompromised'],
+        priorityLevel: 'EPI พื้นฐาน & บุคลากรการแพทย์',
+        indication: 'ในเด็กฉีดเข็มแรกอายุ 9–12 เดือน และเข็มที่ 2 อายุ 18 เดือน (1 ปีครึ่ง) สำหรับผู้ใหญ่หรือบุคลากรทางการแพทย์ที่ไม่มีภูมิคุ้มกัน แนะนำฉีด 1–2 เข็ม ห่างกันอย่างน้อย 4 สัปดาห์ (ห้ามฉีดในหญิงตั้งครรภ์และภูมิคุ้มกันบกพร่องรุนแรง)',
+        totalDosesText: '2 เข็ม (เด็ก: 9–12 เดือน และ 18 เดือน | ผู้ใหญ่: 0, 1 เดือน)',
+        doses: [
+          { doseNo: 1, label: 'เข็มที่ 1 (เด็ก 9–12 เดือน หรือ ผู้ใหญ่เข็มแรก)', recNextDays: 180, minNextDays: 28, intervalDesc: 'ในเด็กนัดที่อายุ 18 เดือน / ในผู้ใหญ่นัดห่างกันอย่างน้อย 4 สัปดาห์ (28 วัน)' },
+          { doseNo: 2, label: 'เข็มที่ 2', recNextDays: null, minNextDays: null, intervalDesc: 'ครบ 2 เข็ม' }
+        ]
+      },
+      {
+        id: 'laje',
+        name: 'วัคซีนไข้สมองอักเสบเจอี ชนิดเชื้อเป็นอ่อนฤทธิ์ (LAJE)',
+        shortCode: 'Live JE (LAJE)',
+        tradeNames: 'CD-JEVAX®, IMOJEV®, THAIJEV®',
+        vaccineType: 'Live-attenuated virus (วัคซีนเชื้อเป็นอ่อนฤทธิ์)',
+        route: 'SC (0.5 mL)',
+        ageGroups: ['child_9m_2y'],
+        riskTags: ['hcw_travel'],
+        contraindicatedIn: ['pregnant', 'immunocompromised'],
+        priorityLevel: 'EPI พื้นฐานจำเป็น',
+        indication: 'เด็กไทยทุกคน เริ่มเข็มแรกที่อายุ 9–12 เดือน และฉีดเข็มที่ 2 ห่างกัน 12–24 เดือน (อายุประมาณ 2–2 ปีครึ่ง) ส่วนผู้ใหญ่ที่ต้องการภูมิคุ้มกันสามารถฉีด IMOJEV 1 เข็มได้',
+        totalDosesText: '2 เข็ม ในเด็ก (ห่างกัน 12–24 เดือน)',
+        doses: [
+          { doseNo: 1, label: 'เข็มที่ 1 (อายุ 9–12 เดือน)', recNextDays: 365, minNextDays: 90, intervalDesc: 'นัดเข็มที่ 2 ห่างกัน 12–24 เดือน (ขั้นต่ำ 3 เดือนสำหรับ CD-JEVAX)' },
+          { doseNo: 2, label: 'เข็มที่ 2 (อายุ 2–2.5 ปี)', recNextDays: null, minNextDays: null, intervalDesc: 'ครบ 2 เข็ม' }
+        ]
+      },
+      {
+        id: 'varicella',
+        name: 'วัคซีนป้องกันโรคอีสุกอีใส (Varicella Vaccine)',
+        shortCode: 'VZV / Varicella',
+        tradeNames: 'Varilrix®, Varivax®, SKYVaricella®',
+        vaccineType: 'Live-attenuated virus (วัคซีนเชื้อเป็นอ่อนฤทธิ์)',
+        route: 'SC (0.5 mL)',
+        ageGroups: ['child_9m_2y', 'child_4_6y', 'adolescent_9_18y', 'adult_19_26y', 'adult_27_49y'],
+        riskTags: ['hcw_travel'],
+        contraindicatedIn: ['pregnant', 'immunocompromised'],
+        priorityLevel: 'วัคซีนเสริมแนะนำ / บุคลากรทางการแพทย์',
+        indication: 'เด็กอายุ 12–18 เดือน (เข็ม 1) และกระตุ้นเข็ม 2 ที่อายุ 18 เดือน–4 ปี (ห่างอย่างน้อย 3 เดือน) หากเริ่มฉีดเมื่ออายุ ≥ 13 ปี หรือผู้ใหญ่ที่ยังไม่เคยเป็นอีสุกอีใส ให้ฉีด 2 เข็ม ห่างกัน 4–8 สัปดาห์',
+        totalDosesText: '2 เข็ม (ผู้ใหญ่/อายุ ≥13 ปี ห่างกัน 4–8 สัปดาห์ | เด็กเล็กห่าง ≥3 เดือน)',
+        doses: [
+          { doseNo: 1, label: 'เข็มที่ 1', recNextDays: 42, minNextDays: 28, intervalDesc: 'ผู้ใหญ่/อายุ ≥13 ปี ห่างกัน 4–8 สัปดาห์ (เด็ก <13 ปี ห่างอย่างน้อย 3 เดือน)' },
+          { doseNo: 2, label: 'เข็มที่ 2', recNextDays: null, minNextDays: null, intervalDesc: 'ครบ 2 เข็ม' }
+        ]
+      },
+      {
+        id: 'dengue_qdenga',
+        name: 'วัคซีนป้องกันโรคไข้เลือดออก ชนิด 4 สายพันธุ์',
+        shortCode: 'Dengue (TAK-003)',
+        tradeNames: 'Qdenga® (TAK-003)',
+        vaccineType: 'Live-attenuated tetravalent dengue vaccine (เชื้อเป็นอ่อนฤทธิ์)',
+        route: 'SC (0.5 mL) บริเวณต้นแขน',
+        ageGroups: ['child_4_6y', 'adolescent_9_18y', 'adult_19_26y', 'adult_27_49y', 'adult_50_59y'],
+        riskTags: [],
+        contraindicatedIn: ['pregnant', 'immunocompromised'],
+        priorityLevel: 'วัคซีนแนะนำตามช่วงวัย (4–60 ปี)',
+        indication: 'ป้องกันโรคไข้เลือดออกจากไวรัสเดงกีทั้ง 4 สายพันธุ์ และลดความรุนแรงของการนอนโรงพยาบาล แนะนำในผู้ที่มีอายุ 4–60 ปี ทั้งผู้ที่เคยและไม่เคยติดเชื้อมาก่อนโดยไม่ต้องตรวจเลือดก่อนฉีด',
+        totalDosesText: '2 เข็ม ห่างกัน 3 เดือน (0, 3 เดือน)',
+        doses: [
+          { doseNo: 1, label: 'เข็มที่ 1 (เดือนที่ 0)', recNextDays: 90, minNextDays: 90, intervalDesc: 'นัดเข็มที่ 2 ห่างจากเข็มแรก 3 เดือน (90 วัน)' },
+          { doseNo: 2, label: 'เข็มที่ 2 (เดือนที่ 3)', recNextDays: null, minNextDays: null, intervalDesc: 'ครบชุด 2 เข็ม' }
+        ]
+      },
+      {
+        id: 'hpv_9_14',
+        name: 'วัคซีนเอชพีวี (สำหรับเด็กและวัยรุ่นอายุ 9–14 ปี สูตร 2 เข็ม)',
+        shortCode: 'HPV (9–14 ปี: 2 เข็ม)',
+        tradeNames: 'Gardasil 9® (9 สายพันธุ์), Gardasil® (4 สายพันธุ์), Cervarix® (2 สายพันธุ์), Cecolin®',
+        vaccineType: 'Recombinant VLP (เชื้อตาย)',
+        route: 'IM (0.5 mL)',
+        ageGroups: ['adolescent_9_18y'],
+        riskTags: [],
+        contraindicatedIn: ['pregnant'],
+        priorityLevel: 'EPI ป.5 & แนะนำสูงในวัยรุ่น',
+        indication: 'เด็กหญิงและเด็กชายที่เริ่มฉีดเข็มแรกตั้งแต่อายุ 9–14 ปี (และภูมิคุ้มกันปกติ) ใช้เพียง 2 เข็ม ห่างกัน 6–12 เดือน ป้องกันมะเร็งปากมดลูก มะเร็งทวารหนัก และหูดหงอนไก่',
+        totalDosesText: '2 เข็ม (0, 6–12 เดือน)',
+        doses: [
+          { doseNo: 1, label: 'เข็มที่ 1 (เดือนที่ 0)', recNextDays: 180, minNextDays: 150, intervalDesc: 'นัดเข็มที่ 2 ห่างกัน 6–12 เดือน (ขั้นต่ำ 5 เดือน / 24 สัปดาห์)' },
+          { doseNo: 2, label: 'เข็มที่ 2 (เดือนที่ 6–12)', recNextDays: null, minNextDays: null, intervalDesc: 'ครบ 2 เข็มสำหรับผู้เริ่มฉีดที่อายุ 9–14 ปี' }
+        ]
+      },
+      {
+        id: 'hpv_adult',
+        name: 'วัคซีนเอชพีวี (อายุ ≥ 15 ปีขึ้นไป หรือผู้ที่มีภูมิคุ้มกันบกพร่อง สูตร 3 เข็ม)',
+        shortCode: 'HPV (≥15 ปี: 3 เข็ม)',
+        tradeNames: 'Gardasil 9® (9 สายพันธุ์), Gardasil® (4 สายพันธุ์), Cervarix® (2 สายพันธุ์)',
+        vaccineType: 'Recombinant VLP (เชื้อตาย)',
+        route: 'IM (0.5 mL)',
+        ageGroups: ['adolescent_9_18y', 'adult_19_26y', 'adult_27_49y'],
+        riskTags: ['immunocompromised'],
+        contraindicatedIn: ['pregnant'],
+        priorityLevel: 'แนะนำในอายุ 15–26 ปี (และพิจารณาใน 27–45 ปี)',
+        indication: 'ผู้ที่เริ่มฉีดตั้งแต่อายุ 15–26 ปีทุกคน (หรืออายุ 27–45 ปีตามการตัดสินใจร่วมกับแพทย์) รวมถึงผู้ที่มีภูมิคุ้มกันบกพร่อง/ติดเชื้อ HIV ทุกช่วงอายุ ต้องฉีด 3 เข็ม (0, 1–2, 6 เดือน)',
+        totalDosesText: '3 เข็ม (0, 2, 6 เดือน หรือ 0, 1, 6 เดือน)',
+        doses: [
+          { doseNo: 1, label: 'เข็มที่ 1 (เดือนที่ 0)', recNextDays: 60, minNextDays: 28, intervalDesc: 'นัดเข็มที่ 2 ห่างจากเข็มแรก 1–2 เดือน (ขั้นต่ำ 4 สัปดาห์)' },
+          { doseNo: 2, label: 'เข็มที่ 2 (เดือนที่ 1–2)', recNextDays: 120, minNextDays: 84, intervalDesc: 'นัดเข็มที่ 3 ที่เดือนที่ 6 (ห่างเข็มสอง ≥ 12 สัปดาห์ และห่างเข็มแรก ≥ 24 สัปดาห์)' },
+          { doseNo: 3, label: 'เข็มที่ 3 (เดือนที่ 6)', recNextDays: null, minNextDays: null, intervalDesc: 'ครบชุด 3 เข็ม' }
+        ]
+      },
+      {
+        id: 'tdap_td',
+        name: 'วัคซีนคอตีบ-บาดทะยัก-ไอกรน ชนิดไร้เซลล์สำหรับผู้ใหญ่/วัยรุ่น',
+        shortCode: 'Tdap / TdaP / Td',
+        tradeNames: 'Boostrix®, Adacel®, Boostagen® (Recombinant TdaP), Pertagen® (aP เดี่ยว)',
+        vaccineType: 'Toxoid + Acellular Pertussis (เชื้อตาย)',
+        route: 'IM (0.5 mL)',
+        ageGroups: ['adolescent_9_18y', 'adult_19_26y', 'adult_27_49y', 'adult_50_59y', 'senior_60_plus'],
+        riskTags: ['pregnant', 'hcw_travel', 'chronic'],
+        contraindicatedIn: [],
+        priorityLevel: 'จำเป็นในทุกช่วงวัย & หญิงตั้งครรภ์',
+        indication: '1) หญิงตั้งครรภ์: แนะนำฉีด Tdap/TdaP 1 เข็ม ในทุกการตั้งครรภ์ที่อายุครรภ์ 27–36 สัปดาห์ เพื่อส่งต่อภูมิคุ้มกันไอกรนสู่ทารก 2) วัยรุ่น 11–12 ปี และผู้ใหญ่ทุกคน: แนะนำฉีด Tdap อย่างน้อย 1 ครั้ง จากนั้นกระตุ้นด้วย Td หรือ Tdap ทุก 10 ปี',
+        totalDosesText: '1 เข็ม กระตุ้นทุก 10 ปี (หรือฉีด 3 เข็ม 0, 1, 6 เดือน หากไม่เคยฉีดในวัยเด็ก)',
+        doses: [
+          { doseNo: 1, label: 'เข็มกระตุ้น Tdap / Td (หรือเข็มที่ 1 ในผู้ไม่เคยฉีด)', recNextDays: 3650, minNextDays: 1825, intervalDesc: 'กรณีเคยได้รับครบในวัยเด็ก: นัดฉีดกระตุ้นครั้งถัดไปอีก 10 ปี (หากไม่เคยฉีดเลย นัดเข็มสองในอีก 1 เดือน)' },
+          { doseNo: 2, label: 'เข็มกระตุ้นรอบถัดไป (10 ปี)', recNextDays: null, minNextDays: null, intervalDesc: 'กระตุ้นซ้ำทุก 10 ปี' }
+        ]
+      },
+      {
+        id: 'influenza',
+        name: 'วัคซีนป้องกันไข้หวัดใหญ่ประจำปี (Influenza Vaccine)',
+        shortCode: 'Influenza (QIV / High-Dose)',
+        tradeNames: 'Vaxigrip Tetra®, Fluquadri®, Influvac Tetra®, Fluzone High-Dose® (สำหรับผู้สูงอายุ ≥65 ปี)',
+        vaccineType: 'Inactivated split-virion / subunit (เชื้อตาย)',
+        route: 'IM (0.5 mL)',
+        ageGroups: ['infant_0_6m', 'child_9m_2y', 'child_4_6y', 'adolescent_9_18y', 'adult_19_26y', 'adult_27_49y', 'adult_50_59y', 'senior_60_plus'],
+        riskTags: ['pregnant', 'chronic', 'immunocompromised', 'ckd', 'asplenia', 'hcw_travel'],
+        contraindicatedIn: [],
+        priorityLevel: 'จำเป็นทุกปี (ทุกช่วงวัย ≥ 6 เดือน)',
+        indication: 'แนะนำฉีดทุกปีในทุกคนตั้งแต่อายุ 6 เดือนขึ้นไป โดยเฉพาะหญิงตั้งครรภ์ (ฉีดได้ทุกไตรมาส), ผู้สูงอายุ ≥ 65 ปี (พิจารณาชนิด High-Dose หรือ Adjuvanted), โรคเรื้อรัง 7 กลุ่มโรค และบุคลากรทางการแพทย์ (เด็ก < 9 ปีที่ฉีดปีแรกให้ฉีด 2 เข็มห่างกัน 1 เดือน)',
+        totalDosesText: 'ปีละ 1 เข็ม (เด็ก < 9 ปีที่รับครั้งแรกในชีวิต ฉีด 2 เข็ม ห่างกัน 4 สัปดาห์)',
+        doses: [
+          { doseNo: 1, label: 'เข็มประจำปี (หรือเข็มที่ 1 ในเด็ก <9 ปีที่ฉีดปีแรก)', recNextDays: 365, minNextDays: 28, intervalDesc: 'ผู้ใหญ่/เด็กที่เคยฉีดแล้ว: นัดอีก 1 ปี (365 วัน) | เด็ก <9 ปีที่ฉีดปีแรก: นัดเข็ม 2 ในอีก 4 สัปดาห์ (28 วัน)' },
+          { doseNo: 2, label: 'เข็มประจำปีถัดไป', recNextDays: null, minNextDays: null, intervalDesc: 'ฉีดกระตุ้นซ้ำทุก 1 ปี ก่อนฤดูฝนหรือฤดูหนาว' }
+        ]
+      },
+      {
+        id: 'zoster_shingrix',
+        name: 'วัคซีนป้องกันโรคงูสวัด ชนิดซับยูนิต (Recombinant Zoster Vaccine)',
+        shortCode: 'RZV (Shingrix)',
+        tradeNames: 'Shingrix® (Recombinant Zoster Vaccine; RZV) / Skyzoster® (Live ZVL)',
+        vaccineType: 'Recombinant subunit vaccine with AS01B adjuvant (เชื้อตาย สำหรับ Shingrix)',
+        route: 'IM (0.5 mL)',
+        ageGroups: ['adult_50_59y', 'senior_60_plus'],
+        riskTags: ['immunocompromised', 'chronic', 'ckd'],
+        contraindicatedIn: ['pregnant'],
+        priorityLevel: 'แนะนำสูงในอายุ ≥ 50 ปี และภูมิคุ้มกันบกพร่อง ≥ 18 ปี',
+        indication: 'ป้องกันโรคงูสวัดและอาการปวดปลายประสาทหลังเป็นงูสวัด (PHN) แนะนำ Shingrix (RZV) ในผู้ใหญ่อายุ ≥ 50 ปีทุกคน และผู้ที่มีอายุ ≥ 18 ปีที่มีภาวะภูมิคุ้มกันบกพร่อง (หมายเหตุ: ชนิดเชื้อเป็น ZVL ห้ามใช้ในผู้ที่ภูมิคุ้มกันบกพร่อง)',
+        totalDosesText: '2 เข็ม ห่างกัน 2–6 เดือน (ผู้ที่ภูมิคุ้มกันบกพร่องรุนแรงร่นระยะเป็น 1–2 เดือนได้)',
+        doses: [
+          { doseNo: 1, label: 'เข็มที่ 1 (เดือนที่ 0)', recNextDays: 60, minNextDays: 28, intervalDesc: 'ผู้ใหญ่ทั่วไป: นัดเข็มที่ 2 ห่างกัน 2–6 เดือน | ภูมิคุ้มกันบกพร่อง: ห่างกัน 1–2 เดือน (ขั้นต่ำ 4 สัปดาห์)' },
+          { doseNo: 2, label: 'เข็มที่ 2 (เดือนที่ 2–6)', recNextDays: null, minNextDays: null, intervalDesc: 'ครบชุด 2 เข็ม' }
+        ]
+      },
+      {
+        id: 'pneumo_adult_seq',
+        name: 'วัคซีนนิวโมค็อกคัสในผู้ใหญ่และผู้สูงอายุ (PCV13 / PCV15 / PCV20 / PPSV23)',
+        shortCode: 'Pneumococcal (Adult)',
+        tradeNames: 'Prevnar 20® (PCV20), Vaxneuvance® (PCV15), Prevnar 13® (PCV13), Pneumovax 23® (PPSV23)',
+        vaccineType: 'Conjugate (PCV) และ Polysaccharide (PPSV23) (เชื้อตาย)',
+        route: 'IM (PCV/PPSV23) หรือ SC (PPSV23)',
+        ageGroups: ['adult_50_59y', 'senior_60_plus'],
+        riskTags: ['chronic', 'immunocompromised', 'asplenia', 'ckd'],
+        contraindicatedIn: [],
+        priorityLevel: 'แนะนำสูงในผู้สูงอายุ ≥ 60–65 ปี และโรคเรื้อรัง/ภูมิคุ้มกันต่ำ',
+        indication: 'ป้องกันโรคปอดอักเสบและติดเชื้อนิวโมค็อกคัสรุนแรง แนะนำในผู้ใหญ่อายุ ≥ 50–65 ปี และผู้ใหญ่ทุกอายุที่มีโรคเรื้อรัง ไม่มีม้าม หรือภูมิคุ้มกันบกพร่อง ทางเลือกที่ 1: ฉีด PCV20 เพียง 1 เข็มจบ | ทางเลือกที่ 2: ฉีด PCV13 หรือ PCV15 จำนวน 1 เข็ม แล้วตามด้วย PPSV23 อีก 1 เข็ม',
+        totalDosesText: '1 เข็ม (กรณี PCV20) หรือ 2 เข็ม (PCV13/15 ตามด้วย PPSV23 ห่าง 1 ปี หรือ ≥ 8 สัปดาห์ในกลุ่มภูมิคุ้มกันต่ำ)',
+        doses: [
+          { doseNo: 1, label: 'เข็มที่ 1: ฉีด PCV13 หรือ PCV15 (หากฉีด PCV20 ถือว่าครบทันที)', recNextDays: 365, minNextDays: 56, intervalDesc: 'นัดฉีด PPSV23 ห่างกันอย่างน้อย 1 ปี (365 วัน) หรือร่นเป็น ≥ 8 สัปดาห์ (56 วัน) ในผู้ที่ภูมิคุ้มกันบกพร่อง/ไม่มีม้าม' },
+          { doseNo: 2, label: 'เข็มที่ 2: ฉีด PPSV23 (Pneumovax 23)', recNextDays: null, minNextDays: null, intervalDesc: 'ครบตามเกณฑ์ (ผู้ที่มีภูมิคุ้มกันบกพร่องอาจพิจารณากระตุ้น PPSV23 ซ้ำอีก 1 ครั้ง ห่าง 5 ปี)' }
+        ]
+      },
+      {
+        id: 'rsv_vaccine',
+        name: 'วัคซีนป้องกันเชื้อไวรัสอาร์เอสวี (RSV Vaccine)',
+        shortCode: 'RSV Vaccine',
+        tradeNames: 'Arexvy® (GSK - มี Adjuvant AS01E), Abrysvo® (Pfizer - Bivalent F protein)',
+        vaccineType: 'Recombinant subunit protein vaccine (เชื้อตาย)',
+        route: 'IM (0.5 mL)',
+        ageGroups: ['adult_50_59y', 'senior_60_plus'],
+        riskTags: ['pregnant', 'chronic', 'ckd'],
+        contraindicatedIn: [],
+        priorityLevel: 'แนะนำในผู้สูงอายุ ≥ 60 ปี และหญิงตั้งครรภ์ 24–36 สัปดาห์',
+        indication: '1) ผู้สูงอายุ ≥ 60 ปีขึ้นไป หรืออายุ 50–59 ปีที่มีโรคประจำตัวเรื้อรัง (โรคปอด โรคหัวใจ เบาหวาน ไตเรื้อรัง) แนะนำฉีด Arexvy หรือ Abrysvo 1 เข็ม 2) หญิงตั้งครรภ์อายุครรภ์ 24–36 สัปดาห์ ใช้เฉพาะรุ่น Abrysvo® 1 เข็ม เพื่อส่งภูมิคุ้มกันให้ทารกแรกเกิด',
+        totalDosesText: '1 เข็ม ครั้งเดียว',
+        doses: [
+          { doseNo: 1, label: 'เข็มที่ 1 (Single Dose)', recNextDays: null, minNextDays: null, intervalDesc: 'ฉีด 1 เข็ม (ปัจจุบันยังไม่มีคำแนะนำให้ฉีดกระตุ้นซ้ำทุกปีในผู้สูงอายุ)' }
+        ]
+      },
+      {
+        id: 'hepb_adult',
+        name: 'วัคซีนไวรัสตับอักเสบบีในผู้ใหญ่ (และสูตรผู้ป่วยโรคไต/ฟอกไต)',
+        shortCode: 'Hepatitis B (Adult / CKD)',
+        tradeNames: 'Engerix-B® (20 mcg/1 mL), Heberbiovac HB®, Twinrix® (รวมตับอักเสบเอและบี)',
+        vaccineType: 'Recombinant HBsAg (เชื้อตาย)',
+        route: 'IM บริเวณต้นแขน (Deltoid)',
+        ageGroups: ['adult_19_26y', 'adult_27_49y', 'adult_50_59y', 'senior_60_plus'],
+        riskTags: ['ckd', 'chronic', 'hcw_travel', 'immunocompromised'],
+        contraindicatedIn: [],
+        priorityLevel: 'แนะนำในผู้เกิดก่อน พ.ศ. 2535 / บุคลากร / โรคไต',
+        indication: 'ผู้ใหญ่ที่ไม่เคยได้รับวัคซีนหรือไม่มีภูมิคุ้มกัน (Anti-HBs < 10 mIU/mL) ฉีด 3 เข็ม (0, 1, 6 เดือน) สำหรับผู้ป่วยไตเรื้อรัง/ฟอกไต หรือภูมิคุ้มกันบกพร่อง ใช้ขนาด 2 เท่า (40 mcg หรือ 2 mL) จำนวน 4 เข็ม ที่เดือน 0, 1, 2 และ 6',
+        totalDosesText: 'ผู้ใหญ่ทั่วไป 3 เข็ม (0, 1, 6 เดือน) | ฟอกไต/ภูมิคุ้มกันต่ำ 4 เข็ม (0, 1, 2, 6 เดือน)',
+        doses: [
+          { doseNo: 1, label: 'เข็มที่ 1 (เดือนที่ 0)', recNextDays: 30, minNextDays: 28, intervalDesc: 'นัดเข็มที่ 2 ห่างกัน 1 เดือน (ขั้นต่ำ 4 สัปดาห์)' },
+          { doseNo: 2, label: 'เข็มที่ 2 (เดือนที่ 1)', recNextDays: 150, minNextDays: 56, intervalDesc: 'สูตรปกติ 3 เข็ม: นัดเข็มที่ 3 ที่เดือนที่ 6 (ห่างเข็มสอง 5 เดือน) | สูตรฟอกไต 4 เข็ม: นัดเข็มที่ 3 ที่เดือนที่ 2' },
+          { doseNo: 3, label: 'เข็มที่ 3 (เดือนที่ 6)', recNextDays: null, minNextDays: null, intervalDesc: 'ครบชุด 3 เข็ม (ตรวจ Anti-HBs หลังครบ 1–2 เดือนในกลุ่มเสี่ยง)' }
+        ]
+      },
+      {
+        id: 'hepa',
+        name: 'วัคซีนป้องกันไวรัสตับอักเสบเอ (Hepatitis A Vaccine)',
+        shortCode: 'Hepatitis A (HAV)',
+        tradeNames: 'Havrix® (ชนิดเชื้อตาย), Vaqta®, Avaxim®, Mevac-A® (ชนิดเชื้อเป็น 1 เข็ม)',
+        vaccineType: 'Inactivated virus (Havrix/Vaqta/Avaxim) หรือ Live-attenuated (Mevac-A)',
+        route: 'IM (เชื้อตาย) หรือ SC (Mevac-A)',
+        ageGroups: ['child_9m_2y', 'child_4_6y', 'adolescent_9_18y', 'adult_19_26y', 'adult_27_49y'],
+        riskTags: ['chronic', 'hcw_travel'],
+        contraindicatedIn: [],
+        priorityLevel: 'วัคซีนเสริมแนะนำ / โรคตับเรื้อรัง / นักเดินทาง',
+        indication: 'เริ่มฉีดได้ตั้งแต่อายุ 1 ปีขึ้นไป รวมทั้งผู้ใหญ่ที่เป็นโรคตับเรื้อรัง ชายที่มีเพศสัมพันธ์กับชาย และผู้เดินทาง ชนิดเชื้อตายฉีด 2 เข็ม ห่างกัน 6–12 เดือน (ส่วนชนิดเชื้อเป็น Mevac-A ใช้ได้ตั้งแต่อายุ 18 เดือน ฉีดเพียง 1 เข็ม)',
+        totalDosesText: '2 เข็ม ห่างกัน 6–12 เดือน (สำหรับชนิดเชื้อตาย)',
+        doses: [
+          { doseNo: 1, label: 'เข็มที่ 1 (เดือนที่ 0)', recNextDays: 180, minNextDays: 180, intervalDesc: 'นัดเข็มที่ 2 ห่างกัน 6–12 เดือน (180 วัน)' },
+          { doseNo: 2, label: 'เข็มที่ 2 (เดือนที่ 6–12)', recNextDays: null, minNextDays: null, intervalDesc: 'ครบ 2 เข็ม' }
+        ]
+      },
+      {
+        id: 'meningococcal',
+        name: 'วัคซีนป้องกันโรคไข้กาฬหลังแอ่น (Meningococcal Conjugate Vaccine)',
+        shortCode: 'MCV4 / MenACWY / MenB',
+        tradeNames: 'Menactra® (MCV4-DT), Menveo® (MCV4-CRM), MenQuadfi®, Bexsero® (MenB)',
+        vaccineType: 'Polysaccharide-Protein Conjugate (เชื้อตาย)',
+        route: 'IM (0.5 mL)',
+        ageGroups: ['child_9m_2y', 'adolescent_9_18y', 'adult_19_26y', 'adult_27_49y'],
+        riskTags: ['asplenia', 'immunocompromised', 'hcw_travel'],
+        contraindicatedIn: [],
+        priorityLevel: 'จำเป็นในผู้ไม่มีม้าม & ผู้เดินทางพิธีฮัจญ์/ศึกษาต่อต่างประเทศ',
+        indication: '1) ผู้เดินทางไปประกอบพิธีฮัจญ์/อุมเราะห์ หรือศึกษาต่อต่างประเทศ: ฉีด 1 เข็ม (ก่อนเดินทางอย่างน้อย 10 วัน) 2) ผู้ที่ไม่มีม้าม ม้ามทำงานผิดปกติ หรือติดเชื้อ HIV: แนะนำฉีด MCV4 จำนวน 2 เข็ม ห่างกันอย่างน้อย 8 สัปดาห์ และกระตุ้นทุก 5 ปี',
+        totalDosesText: '1 เข็ม (นักเดินทาง) หรือ 2 เข็ม ห่างกัน 8 สัปดาห์ (ผู้ที่ไม่มีม้าม/ภูมิคุ้มกันบกพร่อง)',
+        doses: [
+          { doseNo: 1, label: 'เข็มที่ 1', recNextDays: 56, minNextDays: 56, intervalDesc: 'กรณีไม่มีม้าม/ภูมิคุ้มกันบกพร่อง: นัดเข็มที่ 2 ห่างกัน 8 สัปดาห์ (56 วัน) | กรณีเดินทางทั่วไป: ฉีดเข็มเดียวครบ' },
+          { doseNo: 2, label: 'เข็มที่ 2 (สำหรับกลุ่มเสี่ยงไม่มีม้าม/ขาด Complement)', recNextDays: 1825, minNextDays: 1825, intervalDesc: 'กระตุ้นซ้ำทุก 5 ปี หากยังมีความเสี่ยง' }
+        ]
+      },
+      {
+        id: 'rabies_prep',
+        name: 'วัคซีนพิษสุนัขบ้า แบบป้องกันล่วงหน้าก่อนสัมผัสโรค (Pre-exposure; PrEP)',
+        shortCode: 'Rabies (PrEP)',
+        tradeNames: 'Verorab® (PVRV), Speeda®, Chirorab® (PCECV), TRCS Speeda',
+        vaccineType: 'Inactivated rabies virus (เชื้อตาย)',
+        route: 'IM (1 เข็ม) หรือ ID (2 จุด 0.1 mL)',
+        ageGroups: ['child_4_6y', 'adolescent_9_18y', 'adult_19_26y', 'adult_27_49y', 'adult_50_59y', 'senior_60_plus'],
+        riskTags: ['hcw_travel'],
+        contraindicatedIn: [],
+        priorityLevel: 'กลุ่มเสี่ยงสัมผัสสัตว์ / สัตวแพทย์ / นักเดินทาง',
+        indication: 'ฉีดป้องกันล่วงหน้าก่อนถูกสัตว์กัด สำหรับผู้มีความเสี่ยงหรือเด็กในพื้นที่ระบาด ใช้เพียง 2 ครั้ง คือ วันที่ 0 และวันที่ 7 (หรือวันที่ 21–28 ตามแนวทางเดิม)',
+        totalDosesText: '2 ครั้ง (วันที่ 0 และ วันที่ 7)',
+        doses: [
+          { doseNo: 1, label: 'ครั้งที่ 1 (Day 0)', recNextDays: 7, minNextDays: 7, intervalDesc: 'นัดฉีดเข็มที่ 2 ในวันที่ 7 (ห่าง 7 วัน)' },
+          { doseNo: 2, label: 'ครั้งที่ 2 (Day 7)', recNextDays: null, minNextDays: null, intervalDesc: 'ครบชุดป้องกันล่วงหน้า (หากถูกสัตว์กัดภายหลัง ไม่ต้องฉีด RIG เพียงฉีดกระตุ้น 1–2 ครั้ง)' }
+        ]
+      }
+    ];
+
+    // =========================================================================
+    // TAB SWITCHING LOGIC
+    // =========================================================================
+    function switchTab(tabId) {
+      const tabs = ['tab-screening', 'tab-calculator', 'tab-reference'];
+      tabs.forEach(id => {
+        document.getElementById(id).classList.add('hidden');
+        document.getElementById('btn-' + id).classList.remove('tab-active');
+      });
+      document.getElementById(tabId).classList.remove('hidden');
+      document.getElementById('btn-' + tabId).classList.add('tab-active');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    // =========================================================================
+    // TAB 1: SCREENING & RECOMMENDATION LOGIC
+    // =========================================================================
+    function getSelectedConditions() {
+      const checked = Array.from(document.querySelectorAll('.cond-checkbox:checked')).map(cb => cb.value);
+      return checked;
+    }
+
+    function applyQuickPreset(ageValue, conditionsArray) {
+      document.getElementById('ageGroupSelect').value = ageValue;
+      document.querySelectorAll('.cond-checkbox').forEach(cb => {
+        cb.checked = conditionsArray.includes(cb.value);
+      });
+      renderRecommendations();
+    }
+
+    function resetPatientFilter() {
+      document.getElementById('ageGroupSelect').value = 'adult_19_26y';
+      document.getElementById('searchVaccineInput').value = '';
+      document.querySelectorAll('.cond-checkbox').forEach(cb => cb.checked = false);
+      renderRecommendations();
+    }
+
+    function renderRecommendations() {
+      const ageGroup = document.getElementById('ageGroupSelect').value;
+      const ageLabel = document.getElementById('ageGroupSelect').options[document.getElementById('ageGroupSelect').selectedIndex].text;
+      const selectedConditions = getSelectedConditions();
+      const searchText = document.getElementById('searchVaccineInput').value.trim().toLowerCase();
+
+      const conditionNamesMap = {
+        pregnant: 'หญิงตั้งครรภ์',
+        immunocompromised: 'ภูมิคุ้มกันบกพร่อง/HIV',
+        asplenia: 'ไม่มีม้าม/ม้ามทำงานผิดปกติ',
+        ckd: 'โรคไตเรื้อรัง/ฟอกไต',
+        chronic: 'โรคเรื้อรัง (เบาหวาน/หัวใจ/ปอด/ตับ)',
+        hcw_travel: 'บุคลากรทางการแพทย์/นักเดินทาง'
+      };
+
+      // Update Summary Banner
+      const condSummaryText = selectedConditions.length > 0
+        ? selectedConditions.map(c => `<span class="bg-sky-600 text-white px-2 py-0.5 rounded-md text-xs">${conditionNamesMap[c]}</span>`).join(' ')
+        : '<span class="text-slate-500">ไม่มีภาวะเสี่ยงเพิ่มเติม (สุขภาพทั่วไป)</span>';
+
+      document.getElementById('activeProfileSummary').innerHTML = `
+        <i class="fa-solid fa-user-shield text-sky-600"></i>
+        <span><strong>กลุ่มเป้าหมาย:</strong> ${ageLabel}</span>
+        <span class="text-slate-300">|</span>
+        <span class="flex flex-wrap items-center gap-1"><strong>เงื่อนไขร่วม:</strong> ${condSummaryText}</span>
+      `;
+
+      const recommendedList = [];
+      const contraindicatedList = [];
+
+      VACCINE_DB.forEach(vac => {
+        // Search filter check
+        if (searchText) {
+          const haystack = `${vac.name} ${vac.shortCode} ${vac.tradeNames} ${vac.indication}`.toLowerCase();
+          if (!haystack.includes(searchText)) return;
+        }
+
+        // Check contraindications first
+        const matchedContra = selectedConditions.filter(c => vac.contraindicatedIn.includes(c));
+        const isAgeMatch = vac.ageGroups.includes(ageGroup);
+        const matchedRisk = selectedConditions.filter(c => vac.riskTags.includes(c));
+
+        // Special clinical override: Shingrix is indicated in >=18y if immunocompromised
+        const isAdultAge = ['adult_19_26y', 'adult_27_49y', 'adult_50_59y', 'senior_60_plus'].includes(ageGroup);
+
+        if (matchedContra.length > 0 && (isAgeMatch || matchedRisk.length > 0 || isAdultAge)) {
+          contraindicatedList.push({
+            ...vac,
+            contraReasons: matchedContra.map(c => conditionNamesMap[c])
+          });
+          return;
+        }
+
+        // Check if vaccine should be recommended
+        // If Pregnant is checked, prioritize pregnancy vaccines at the very top
+        let relevanceScore = 0;
+        let matchReasons = [];
+
+        if (selectedConditions.includes('pregnant')) {
+          if (vac.riskTags.includes('pregnant')) {
+            relevanceScore += 100;
+            matchReasons.push('แนะนำสำหรับหญิงตั้งครรภ์');
+          } else if (isAgeMatch && !vac.contraindicatedIn.includes('pregnant')) {
+            relevanceScore += 20;
+            matchReasons.push('พิจารณาตามความเสี่ยงในครรภ์');
+          }
+        } else {
+          if (isAgeMatch) {
+            relevanceScore += 50;
+            matchReasons.push('ตรงตามเกณฑ์ช่วงอายุ');
+          }
+          if (matchedRisk.length > 0 && (isAgeMatch || isAdultAge || ageGroup === 'adolescent_9_18y')) {
+            relevanceScore += matchedRisk.length * 40;
+            matchedRisk.forEach(r => matchReasons.push(`ข้อบ่งใช้สำหรับ${conditionNamesMap[r]}`));
+          }
+        }
+
+        if (relevanceScore > 0) {
+          recommendedList.push({
+            ...vac,
+            relevanceScore,
+            matchReasons
+          });
+        }
+      });
+
+      // Sort by relevanceScore descending
+      recommendedList.sort((a, b) => b.relevanceScore - a.relevanceScore);
+
+      // Render Recommended Cards
+      const recContainer = document.getElementById('recommendedCardsContainer');
+      document.getElementById('recommendedCountBadge').textContent = `${recommendedList.length} รายการ`;
+
+      if (recommendedList.length === 0) {
+        recContainer.innerHTML = `
+          <div class="col-span-full bg-white rounded-2xl p-8 text-center border border-slate-200 text-slate-500">
+            <i class="fa-solid fa-magnifying-glass text-2xl mb-2 text-slate-400"></i>
+            <p class="font-medium">ไม่พบรายการวัคซีนที่ตรงกับคำค้นหาหรือเงื่อนไขที่เลือก</p>
+          </div>
+        `;
+      } else {
+        recContainer.innerHTML = recommendedList.map(vac => {
+          const isLive = vac.vaccineType.includes('เชื้อเป็น');
+          const typeBadgeClass = isLive
+            ? 'bg-amber-100 text-amber-800 border-amber-200'
+            : 'bg-sky-50 text-sky-700 border-sky-200';
+
+          const reasonBadges = vac.matchReasons.map(r =>
+            `<span class="bg-emerald-50 text-emerald-700 border border-emerald-200 text-[11px] font-semibold px-2.5 py-0.5 rounded-full flex items-center gap-1">
+              <i class="fa-solid fa-circle-check text-emerald-500"></i> ${r}
+            </span>`
+          ).join('');
+
+          return `
+            <div class="bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-all p-5 flex flex-col justify-between">
+              <div class="space-y-3">
+                <!-- Top Badges -->
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                  <div class="flex flex-wrap gap-1.5">${reasonBadges}</div>
+                  <span class="text-[11px] font-medium px-2.5 py-0.5 rounded-md border ${typeBadgeClass}">${vac.vaccineType}</span>
+                </div>
+
+                <!-- Vaccine Name & Trade Names -->
+                <div>
+                  <h4 class="text-base font-bold text-slate-900">${vac.name}</h4>
+                  <p class="text-xs font-semibold text-sky-700 mt-1 flex items-center gap-1.5">
+                    <i class="fa-solid fa-tag text-sky-500"></i>
+                    <span>ชื่อการค้า: ${vac.tradeNames}</span>
+                  </p>
+                </div>
+
+                <!-- Clinical Details Grid -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 bg-slate-50 p-3 rounded-xl border border-slate-100 text-xs">
+                  <div>
+                    <span class="text-slate-400 block">จำนวนโดส & ระยะห่าง:</span>
+                    <span class="font-bold text-slate-700">${vac.totalDosesText}</span>
+                  </div>
+                  <div>
+                    <span class="text-slate-400 block">วิธีบริหารยา:</span>
+                    <span class="font-semibold text-slate-700">${vac.route}</span>
+                  </div>
+                </div>
+
+                <!-- Indication -->
+                <p class="text-xs text-slate-600 leading-relaxed">
+                  <strong class="text-slate-700">ข้อบ่งใช้:</strong> ${vac.indication}
+                </p>
+              </div>
+
+              <!-- Action Button to Tab 2 -->
+              <div class="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between">
+                <span class="text-[11px] text-slate-400 font-medium">${vac.priorityLevel}</span>
+                <button onclick="openCalculatorWithVaccine('${vac.id}')" class="bg-teal-600 hover:bg-teal-700 text-white text-xs font-semibold px-3.5 py-2 rounded-xl shadow-sm transition flex items-center gap-1.5">
+                  <i class="fa-solid fa-calendar-check"></i> คำนวณวันนัดเข็มถัดไป
+                </button>
+              </div>
+            </div>
+          `;
+        }).join('');
+      }
+
+      // Render Contraindicated Section if any
+      const contraSection = document.getElementById('contraindicatedSection');
+      const contraContainer = document.getElementById('contraindicatedContainer');
+      if (contraindicatedList.length > 0) {
+        contraSection.classList.remove('hidden');
+        contraContainer.innerHTML = contraindicatedList.map(vac => `
+          <div class="bg-white/90 rounded-xl p-3.5 border border-rose-200 flex flex-col justify-between gap-2">
+            <div>
+              <div class="flex items-center justify-between gap-2">
+                <span class="font-bold text-xs sm:text-sm text-rose-900">${vac.name}</span>
+                <span class="text-[11px] bg-rose-100 text-rose-800 font-bold px-2 py-0.5 rounded">ห้ามฉีด: ${vac.contraReasons.join(', ')}</span>
+              </div>
+              <p class="text-xs text-slate-600 mt-1"><strong>ชื่อการค้า:</strong> ${vac.tradeNames}</p>
+              <p class="text-[11px] text-rose-700 mt-1">เหตุผล: เป็น ${vac.vaccineType} ซึ่งห้ามใช้ในผู้ที่ตั้งครรภ์หรือมีภูมิคุ้มกันบกพร่องรุนแรง</p>
+            </div>
+          </div>
+        `).join('');
+      } else {
+        contraSection.classList.add('hidden');
+      }
+    }
+
+    // =========================================================================
+    // TAB 2: NEXT APPOINTMENT CALCULATOR LOGIC
+    // =========================================================================
+    function initCalculatorDropdown() {
+      const select = document.getElementById('calcVaccineSelect');
+      select.innerHTML = VACCINE_DB.map(vac =>
+        `<option value="${vac.id}">${vac.shortCode} — ${vac.name}</option>`
+      ).join('');
+
+      // Set default date to today
+      const today = new Date();
+      const yyyy = today.getFullYear();
+      const mm = String(today.getMonth() + 1).padStart(2, '0');
+      const dd = String(today.getDate()).padStart(2, '0');
+      document.getElementById('calcDoseDate').value = `${yyyy}-${mm}-${dd}`;
+
+      onCalculatorVaccineChange();
+    }
+
+    function openCalculatorWithVaccine(vaccineId) {
+      document.getElementById('calcVaccineSelect').value = vaccineId;
+      onCalculatorVaccineChange();
+      switchTab('tab-calculator');
+    }
+
+    function onCalculatorVaccineChange() {
+      const vacId = document.getElementById('calcVaccineSelect').value;
+      const vac = VACCINE_DB.find(v => v.id === vacId);
+      if (!vac) return;
+
+      // Update Meta Box
+      document.getElementById('calcVaccineMetaBox').innerHTML = `
+        <div class="font-bold text-slate-800 text-xs sm:text-sm">${vac.name}</div>
+        <div class="text-sky-700 font-semibold"><i class="fa-solid fa-tag mr-1"></i>ชื่อการค้า: ${vac.tradeNames}</div>
+        <div class="text-slate-600"><strong>ประเภท:</strong> ${vac.vaccineType} | <strong>วิธีบริหาร:</strong> ${vac.route}</div>
+        <div class="text-slate-600"><strong>จำนวนโดสทั้งหมด:</strong> ${vac.totalDosesText}</div>
+      `;
+
+      // Populate Dose Select
+      const doseSelect = document.getElementById('calcCurrentDose');
+      doseSelect.innerHTML = vac.doses.map(d =>
+        `<option value="${d.doseNo}">${d.label}</option>`
+      ).join('');
+
+      calculateNextAppointment();
+    }
+
+    function addDays(dateObj, days) {
+      const result = new Date(dateObj);
+      result.setDate(result.getDate() + days);
+      return result;
+    }
+
+    function formatThaiDate(dateObj) {
+      if (!dateObj) return '-';
+      return dateObj.toLocaleDateString('th-TH', {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+      });
+    }
+
+    function formatShortThaiDate(dateObj) {
+      if (!dateObj) return '-';
+      return dateObj.toLocaleDateString('th-TH', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric'
+      });
+    }
+
+    function calculateNextAppointment() {
+      const vacId = document.getElementById('calcVaccineSelect').value;
+      const currentDoseNo = parseInt(document.getElementById('calcCurrentDose').value, 10);
+      const dateStr = document.getElementById('calcDoseDate').value;
+      const patientName = document.getElementById('calcPatientName').value.trim();
+
+      const vac = VACCINE_DB.find(v => v.id === vacId);
+      if (!vac || !dateStr) return;
+
+      const baseDate = new Date(dateStr + 'T00:00:00');
+      const currentDoseObj = vac.doses.find(d => d.doseNo === currentDoseNo);
+
+      document.getElementById('slipTitle').textContent = `${vac.name} (${vac.shortCode})`;
+      document.getElementById('slipPatientDisplay').textContent = patientName
+        ? `ชื่อผู้รับบริการ: ${patientName} | ชื่อการค้า: ${vac.tradeNames}`
+        : `ชื่อการค้า: ${vac.tradeNames}`;
+
+      const highlightBox = document.getElementById('nextDoseHighlightBox');
+
+      if (currentDoseObj && currentDoseObj.recNextDays !== null) {
+        const nextDoseNo = currentDoseNo + 1;
+        const recNextDate = addDays(baseDate, currentDoseObj.recNextDays);
+        const minNextDate = addDays(baseDate, currentDoseObj.minNextDays);
+
+        highlightBox.innerHTML = `
+          <div class="bg-teal-50 border-2 border-teal-500 rounded-2xl p-4">
+            <span class="text-xs font-bold text-teal-700 uppercase">วันนัดหมายเข็มที่ ${nextDoseNo} (Recommended Date)</span>
+            <div class="text-lg sm:text-xl font-bold text-teal-950 mt-1">${formatThaiDate(recNextDate)}</div>
+            <p class="text-xs text-teal-700 mt-1"><i class="fa-regular fa-clock mr-1"></i>${currentDoseObj.intervalDesc}</p>
+          </div>
+          <div class="bg-sky-50 border border-sky-200 rounded-2xl p-4">
+            <span class="text-xs font-bold text-sky-700 uppercase">วันที่สามารถฉีดได้เร็วที่สุด (Minimum Valid Date)</span>
+            <div class="text-base sm:text-lg font-bold text-sky-900 mt-1">${formatThaiDate(minNextDate)}</div>
+            <p class="text-xs text-sky-700 mt-1"><i class="fa-solid fa-shield-halved mr-1"></i>ระยะห่างขั้นต่ำสุดที่ภูมิคุ้มกันตอบสนองได้ดี (${currentDoseObj.minNextDays} วัน)</p>
+          </div>
+        `;
+      } else {
+        highlightBox.innerHTML = `
+          <div class="col-span-full bg-emerald-50 border-2 border-emerald-500 rounded-2xl p-4 flex items-center gap-3">
+            <i class="fa-solid fa-circle-check text-3xl text-emerald-600"></i>
+            <div>
+              <h4 class="font-bold text-emerald-950 text-base">ได้รับวัคซีนครบตามเกณฑ์ชุดนี้แล้ว (Series Complete)</h4>
+              <p class="text-xs text-emerald-800 mt-0.5">${currentDoseObj ? currentDoseObj.intervalDesc : ''}</p>
+            </div>
+          </div>
+        `;
+      }
+
+      // Build Full Multi-dose Timeline Table starting from the selected dose
+      const tbody = document.getElementById('timelineTableBody');
+      let runningRecDate = new Date(baseDate);
+      let runningMinDate = new Date(baseDate);
+      let rowsHtml = '';
+
+      vac.doses.forEach(d => {
+        if (d.doseNo < currentDoseNo) {
+          rowsHtml += `
+            <tr class="text-slate-400 bg-slate-50/50">
+              <td class="py-2.5 px-3 font-medium">${d.label}</td>
+              <td class="py-2.5 px-3">ได้รับแล้วก่อนหน้านี้</td>
+              <td class="py-2.5 px-3">-</td>
+              <td class="py-2.5 px-3">${d.intervalDesc}</td>
+            </tr>
+          `;
+        } else if (d.doseNo === currentDoseNo) {
+          rowsHtml += `
+            <tr class="bg-sky-50/70 font-semibold text-sky-950">
+              <td class="py-2.5 px-3"><span class="bg-sky-600 text-white text-[10px] px-2 py-0.5 rounded mr-1.5">เข็มที่ฉีดวันนี้</span>${d.label}</td>
+              <td class="py-2.5 px-3">${formatShortThaiDate(runningRecDate)}</td>
+              <td class="py-2.5 px-3">-</td>
+              <td class="py-2.5 px-3">${d.intervalDesc}</td>
+            </tr>
+          `;
+        } else {
+          // Calculate based on previous dose interval
+          const prevDose = vac.doses.find(x => x.doseNo === d.doseNo - 1);
+          if (prevDose && prevDose.recNextDays) {
+            runningRecDate = addDays(runningRecDate, prevDose.recNextDays);
+            runningMinDate = addDays(runningMinDate, prevDose.minNextDays);
+          }
+          rowsHtml += `
+            <tr class="font-medium text-slate-800">
+              <td class="py-2.5 px-3 text-teal-800 font-bold"><i class="fa-regular fa-calendar-check mr-1 text-teal-600"></i>${d.label}</td>
+              <td class="py-2.5 px-3 font-bold text-teal-900">${formatShortThaiDate(runningRecDate)}</td>
+              <td class="py-2.5 px-3 text-slate-600">${formatShortThaiDate(runningMinDate)}</td>
+              <td class="py-2.5 px-3 text-xs text-slate-600">${d.intervalDesc}</td>
+            </tr>
+          `;
+        }
+      });
+
+      tbody.innerHTML = rowsHtml;
+
+      // Update Clinical Note
+      document.getElementById('slipClinicalNote').innerHTML = `
+        <div><strong>ข้อบ่งใช้และคำแนะนำเพิ่มเติม:</strong> ${vac.indication}</div>
+        <div><strong>วิธีบริหารยา:</strong> ${vac.route} | <strong>ข้อควรจำ:</strong> หากผู้รับบริการมารับวัคซีนล่าช้ากว่าวันนัด สามารถฉีดเข็มถัดไปต่อได้ทันทีโดยไม่ต้องเริ่มต้นนับเข็มหนึ่งใหม่</div>
+      `;
+    }
+
+    function copyAppointmentText() {
+      const title = document.getElementById('slipTitle').textContent;
+      const highlight = document.getElementById('nextDoseHighlightBox').innerText.replace(/\n+/g, ' | ');
+      const text = `📋 ใบนัดหมายวัคซีน: ${title}\n${highlight}`;
+      navigator.clipboard.writeText(text).then(() => {
+        alert('คัดลอกข้อมูลวันนัดหมายวัคซีนเรียบร้อยแล้ว');
+      });
+    }
+
+    // =========================================================================
+    // TAB 3: MASTER REFERENCE TABLE
+    // =========================================================================
+    function renderMasterTable() {
+      const tbody = document.getElementById('masterTableBody');
+      tbody.innerHTML = VACCINE_DB.map(vac => `
+        <tr class="hover:bg-slate-50 transition">
+          <td class="py-3 px-3 font-bold text-slate-800">${vac.name}<br><span class="text-xs font-normal text-slate-500">${vac.shortCode}</span></td>
+          <td class="py-3 px-3 text-sky-700 font-medium">${vac.tradeNames}</td>
+          <td class="py-3 px-3 text-xs text-slate-600">${vac.vaccineType}<br><span class="text-slate-400">${vac.route}</span></td>
+          <td class="py-3 px-3 text-xs text-slate-600 max-w-xs">${vac.indication}</td>
+          <td class="py-3 px-3 text-xs font-semibold text-slate-700">${vac.totalDosesText}</td>
+          <td class="py-3 px-3 text-center">
+            <button onclick="openCalculatorWithVaccine('${vac.id}')" class="bg-teal-50 hover:bg-teal-100 text-teal-700 border border-teal-200 text-xs font-semibold px-3 py-1.5 rounded-lg transition whitespace-nowrap">
+              <i class="fa-solid fa-calculator mr-1"></i> คำนวณวันนัด
+            </button>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    // Initialize Application on Load
+    window.addEventListener('DOMContentLoaded', () => {
+      renderRecommendations();
+      initCalculatorDropdown();
+      renderMasterTable();
+    });
+  </script>
+</body>
+</html>
